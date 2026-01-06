@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Grid, MoreVertical } from 'lucide-react';
 import { Business, Customer, PaymentRecord } from '../types';
@@ -92,14 +93,14 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
         groupId: activeTabId,
         name,
         phoneNumber: phone,
-        address,
-        photoUrl: image,
         totalDue: initialDue,
         advanceAmount: 0,
         paymentHistory: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-        isPinned: false
+        isPinned: false,
+        ...(address ? { address } : {}),
+        ...(image ? { photoUrl: image } : {})
     };
     onUpdate({
         ...business,

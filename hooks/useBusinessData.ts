@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Business, BusinessType } from '../types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
@@ -71,14 +72,14 @@ export const useBusinessData = () => {
     const newBusiness: Business = { 
         id: newId, 
         name, 
-        ownerName, 
         type, 
         createdAt: new Date(), 
         isNew: true, 
         isPinned: false,
         classes: [], 
         customerGroups: type === BusinessType.SHOP ? [{ id: 'general', name: 'General' }] : [], 
-        customers: [] 
+        customers: [],
+        ...(ownerName ? { ownerName } : {})
     };
     
     addBusinessToFirestore(user.uid, newBusiness);

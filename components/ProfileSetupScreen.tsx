@@ -55,13 +55,15 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
     setIsSaving(true);
     
     try {
+        // Fix: Use spread syntax to only add optional fields if they exist
+        // Firestore throws an error if a field value is explicitly 'undefined'
         const profile: UserProfile = {
           id: initialData?.id || 'current_user',
           name: name.trim(),
           email: email, // Use the read-only email
-          phoneNumber: phone.trim() || undefined,
-          photoUrl: croppedImage || undefined,
-          createdAt: initialData?.createdAt || new Date()
+          createdAt: initialData?.createdAt || new Date(),
+          ...(phone.trim() ? { phoneNumber: phone.trim() } : {}),
+          ...(croppedImage ? { photoUrl: croppedImage } : {})
         };
         await onComplete(profile);
     } catch (err) {

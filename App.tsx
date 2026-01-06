@@ -289,9 +289,13 @@ export const App: React.FC = () => {
                             onAddStudent={(name, fatherName, address, phone, image, joiningDate, initialDue) => {
                                 const newStudent: Student = {
                                     id: crypto.randomUUID(),
-                                    name, fatherName, address, phoneNumber: phone, photoUrl: image,
+                                    name, 
+                                    phoneNumber: phone,
                                     totalDue: initialDue, advanceAmount: 0, pendingMonths: [], paymentHistory: [],
-                                    joiningDate, createdAt: new Date()
+                                    joiningDate, createdAt: new Date(),
+                                    ...(fatherName ? { fatherName } : {}),
+                                    ...(address ? { address } : {}),
+                                    ...(image ? { photoUrl: image } : {})
                                 };
                                 const updatedClass = { ...activeClass, students: [newStudent, ...(activeClass.students || [])] };
                                 const updatedBusiness = {
