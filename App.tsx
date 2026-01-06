@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -97,11 +98,18 @@ export const App: React.FC = () => {
   const handleProfileComplete = async (profileData: UserProfile) => {
       if (!currentUserId) return;
       
-      const completeProfile = { ...profileData, id: currentUserId };
-      await saveUserProfileToDB(completeProfile);
-      setUserProfile(completeProfile);
-      setIsProfileSetupOpen(false);
-      setIsEditingProfile(false);
+      try {
+          const completeProfile = { ...profileData, id: currentUserId };
+          await saveUserProfileToDB(completeProfile);
+          setUserProfile(completeProfile);
+          setIsProfileSetupOpen(false);
+          setIsEditingProfile(false);
+      } catch (e: any) {
+          console.error("Failed to save profile:", e);
+          // Alert the user so they are not stuck
+          alert("Could not save your profile. \n\nPlease ensure you have created a Cloud Firestore Database in your Firebase Console and the Rules allow writes.\n\nError: " + (e.message || "Unknown Error"));
+          throw e; // Propagate error so button stops loading but stays on screen
+      }
   };
 
   const handleLogout = async () => {

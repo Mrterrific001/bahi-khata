@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { BookOpen, Sparkles, ArrowRight, ShieldCheck, Zap, AlertCircle, User } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
@@ -24,7 +25,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             }
         } catch (err: any) {
             console.error("Login failed", err);
-            setError("Failed to sign in. Please try again.");
+            // Show the actual error message from Firebase (e.g., domain not authorized)
+            const errorMessage = err.message || "Failed to sign in. Please try again.";
+            setError(errorMessage);
             setIsLoading(false);
         }
     } else {
@@ -64,9 +67,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
          </div>
 
          {error && (
-             <div className="mb-4 bg-red-50 text-red-600 text-xs p-3 rounded-xl flex items-center justify-center gap-2">
-                 <AlertCircle className="w-4 h-4" />
-                 {error}
+             <div className="mb-4 bg-red-50 text-red-600 text-xs p-3 rounded-xl flex items-start text-left justify-center gap-2 break-words">
+                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                 <span>{error}</span>
              </div>
          )}
          

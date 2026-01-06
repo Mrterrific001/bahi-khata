@@ -1,12 +1,13 @@
+
 import React, { useState, useRef } from 'react';
-import { Camera, User, Phone, ArrowRight, Check, Shield } from 'lucide-react';
+import { Camera, User, Phone, ArrowRight, Check, Shield, Loader2 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ImageCropper } from './ImageCropper';
 
 interface ProfileSetupScreenProps {
   initialData?: UserProfile | null;
   defaultEmail?: string;
-  onComplete: (profile: UserProfile) => void;
+  onComplete: (profile: UserProfile) => Promise<void> | void;
   isEditing?: boolean;
   onCancel?: () => void;
 }
@@ -20,6 +21,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '');
   const [phone, setPhone] = useState(initialData?.phoneNumber || '');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Use email from data or default from login
   const email = initialData?.email || defaultEmail || '';
@@ -46,19 +48,26 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
     setRawImage(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const profile: UserProfile = {
-      id: initialData?.id || 'current_user',
-      name: name.trim(),
-      email: email, // Use the read-only email
-      phoneNumber: phone.trim() || undefined,
-      photoUrl: croppedImage || undefined,
-      createdAt: initialData?.createdAt || new Date()
-    };
-    onComplete(profile);
+    setIsSaving(true);
+    
+    try {
+        const profile: UserProfile = {
+          id: initialData?.id || 'current_user',
+          name: name.trim(),
+          email: email, // Use the read-only email
+          phoneNumber: phone.trim() || undefined,
+          photoUrl: croppedImage || undefined,
+          createdAt: initialData?.createdAt || new Date()
+        };
+        await onComplete(profile);
+    } catch (err) {
+        console.error("Error in profile setup:", err);
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -80,7 +89,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)]"></div>
                <div className="absolute top-4 right-4">
                   {isEditing && onCancel && (
-                      <button onClick={onCancel} className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors">
+                      <button type="button" onClick={onCancel} className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors">
                           <ArrowRight className="w-5 h-5 rotate-180" />
                       </button>
                   )}
@@ -94,8 +103,8 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                   {/* Avatar Upload */}
                   <div className="flex justify-center mb-8">
                      <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="relative w-32 h-32 rounded-full bg-white p-1.5 shadow-xl cursor-pointer group"
+                        onClick={() => !isSaving && fileInputRef.current?.click()}
+                        className={`relative w-32 h-32 rounded-full bg-white p-1.5 shadow-xl group ${isSaving ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                      >
                         <div className="w-full h-full rounded-full bg-slate-100 overflow-hidden relative border-2 border-slate-100 group-hover:border-violet-300 transition-colors">
                             {croppedImage ? (
@@ -117,6 +126,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                             type="file" 
                             accept="image/*" 
                             className="hidden" 
+                            disabled={isSaving}
                             onChange={handleImageChange}
                         />
                      </div>
@@ -142,8 +152,9 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                                   type="text" 
                                   value={name}
                                   onChange={e => setName(e.target.value)}
+                                  disabled={isSaving}
                                   placeholder="e.g. Pradeep Gupta"
-                                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all font-medium text-slate-800"
+                                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all font-medium text-slate-800 disabled:opacity-60"
                               />
                           </div>
                       </div>
@@ -156,8 +167,9 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                                   type="tel" 
                                   value={phone}
                                   onChange={e => setPhone(e.target.value)}
+                                  disabled={isSaving}
                                   placeholder="+91 98765 43210"
-                                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all font-medium text-slate-800"
+                                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all font-medium text-slate-800 disabled:opacity-60"
                               />
                           </div>
                       </div>
@@ -165,10 +177,20 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
 
                   <button 
                       type="submit"
-                      className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 rounded-xl shadow-xl shadow-violet-200 mt-8 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
+                      disabled={isSaving}
+                      className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white font-bold py-4 rounded-xl shadow-xl shadow-violet-200 mt-8 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
                   >
-                      <span>{isEditing ? 'Save Changes' : 'Continue'}</span>
-                      {isEditing ? <Check className="w-5 h-5" /> : <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{isEditing ? 'Save Changes' : 'Continue'}</span>
+                          {isEditing ? <Check className="w-5 h-5" /> : <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+                        </>
+                      )}
                   </button>
               </form>
            </div>
