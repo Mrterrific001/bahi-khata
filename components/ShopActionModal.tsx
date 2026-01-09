@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { X, IndianRupee, Plus, CheckCircle } from 'lucide-react';
 
@@ -37,7 +38,7 @@ export const ShopActionModal: React.FC<ShopActionModalProps> = ({
   const isAdd = type === 'ADD_DUE';
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-xs bg-white rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
          

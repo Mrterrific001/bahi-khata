@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { BookOpen, Sparkles, ArrowRight, ShieldCheck, Zap, AlertCircle, User } from 'lucide-react';
-import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseEnabled } from '../lib/firebase';
 
 interface AuthScreenProps {
@@ -18,7 +17,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     
     if (isFirebaseEnabled && auth && googleProvider) {
         try {
-            const result = await signInWithPopup(auth, googleProvider);
+            const result = await auth.signInWithPopup(googleProvider);
             const user = result.user;
             if (user && user.email) {
                 onLogin(user.email);

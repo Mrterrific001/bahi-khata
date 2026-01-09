@@ -1,10 +1,6 @@
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  deleteDoc,
-  Timestamp 
-} from 'firebase/firestore';
+
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import { db, isFirebaseEnabled } from './firebase';
 import { Business, UserProfile } from '../types';
 
@@ -12,7 +8,7 @@ import { Business, UserProfile } from '../types';
 
 export const convertTimestamps = (data: any): any => {
   if (data === null || data === undefined) return data;
-  if (data instanceof Timestamp) return data.toDate();
+  if (data instanceof firebase.firestore.Timestamp) return data.toDate();
   if (Array.isArray(data)) return data.map((item: any) => convertTimestamps(item));
   if (typeof data === 'object') {
     const newData: any = {};
@@ -42,6 +38,23 @@ export const reviveDates = (data: any): any => {
   return data;
 };
 
+// Helper to remove undefined values which Firebase doesn't support
+const sanitizeData = (data: any): any => {
+  if (data instanceof Date) return data;
+  if (Array.isArray(data)) return data.map(sanitizeData);
+  if (data !== null && typeof data === 'object') {
+    const newObj: any = {};
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      if (value !== undefined) {
+        newObj[key] = sanitizeData(value);
+      }
+    });
+    return newObj;
+  }
+  return data;
+};
+
 // --- LOCAL STORAGE HELPERS ---
 const LOCAL_STORAGE_KEY_PROFILE = 'bahi_khata_profile';
 const LOCAL_STORAGE_KEY_BUSINESSES = 'bahi_khata_businesses';
@@ -61,8 +74,8 @@ const saveLocalBusinesses = (businesses: Business[]) => {
 
 export const saveUserProfileToDB = async (profile: UserProfile) => {
   if (isFirebaseEnabled && db && profile.id) {
-    const userRef = doc(db, 'users', profile.id);
-    await setDoc(userRef, profile, { merge: true });
+    const safeData = sanitizeData(profile);
+    await db.collection('users').doc(profile.id).set(safeData, { merge: true });
   } else {
     // Local Storage Fallback
     localStorage.setItem(LOCAL_STORAGE_KEY_PROFILE, JSON.stringify(profile));
@@ -71,9 +84,8 @@ export const saveUserProfileToDB = async (profile: UserProfile) => {
 
 export const loadUserProfileFromDB = async (userId: string): Promise<UserProfile | null> => {
   if (isFirebaseEnabled && db && userId) {
-    const userRef = doc(db, 'users', userId);
-    const snap = await getDoc(userRef);
-    if (snap.exists()) {
+    const snap = await db.collection('users').doc(userId).get();
+    if (snap.exists) {
       return convertTimestamps(snap.data()) as UserProfile;
     }
   } else {
@@ -88,8 +100,8 @@ export const loadUserProfileFromDB = async (userId: string): Promise<UserProfile
 
 export const addBusinessToFirestore = async (userId: string, business: Business) => {
   if (isFirebaseEnabled && db) {
-    const businessRef = doc(db, `users/${userId}/businesses`, business.id);
-    await setDoc(businessRef, business);
+    const safeData = sanitizeData(business);
+    await db.collection('users').doc(userId).collection('businesses').doc(business.id).set(safeData);
   } else {
     const current = getLocalBusinesses();
     saveLocalBusinesses([...current, business]);
@@ -98,8 +110,8 @@ export const addBusinessToFirestore = async (userId: string, business: Business)
 
 export const updateBusinessInFirestore = async (userId: string, business: Business) => {
   if (isFirebaseEnabled && db) {
-    const businessRef = doc(db, `users/${userId}/businesses`, business.id);
-    await setDoc(businessRef, business, { merge: true });
+    const safeData = sanitizeData(business);
+    await db.collection('users').doc(userId).collection('businesses').doc(business.id).set(safeData, { merge: true });
   } else {
     const current = getLocalBusinesses();
     const updated = current.map(b => b.id === business.id ? business : b);
@@ -109,8 +121,7 @@ export const updateBusinessInFirestore = async (userId: string, business: Busine
 
 export const deleteBusinessFromFirestore = async (userId: string, businessId: string) => {
   if (isFirebaseEnabled && db) {
-    const businessRef = doc(db, `users/${userId}/businesses`, businessId);
-    await deleteDoc(businessRef);
+    await db.collection('users').doc(userId).collection('businesses').doc(businessId).delete();
   } else {
     const current = getLocalBusinesses();
     const updated = current.filter(b => b.id !== businessId);

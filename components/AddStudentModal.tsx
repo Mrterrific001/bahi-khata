@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Calendar, Wallet } from 'lucide-react';
-import { ImageCropper } from './ImageCropper';
+
+import React, { useState } from 'react';
+import { X, Calendar, Wallet } from 'lucide-react';
+import { SmartCameraInput } from './SmartCameraInput';
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -15,11 +16,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [joiningDate, setJoiningDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // Image State
-  const [rawImage, setRawImage] = useState<string | null>(null); // For cropping
-  const [croppedImage, setCroppedImage] = useState<string | null>(null); // Final result
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [image, setImage] = useState<string | null>(null);
 
   // Due calculation state
   const [dueMode, setDueMode] = useState<'MONTHS' | 'MANUAL'>('MONTHS');
@@ -27,23 +24,6 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
   const [manualDue, setManualDue] = useState('0');
 
   if (!isOpen) return null;
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRawImage(reader.result as string);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCropComplete = (cropped: string) => {
-    setCroppedImage(cropped);
-    setRawImage(null);
-  };
 
   const getFinalDue = () => {
     if (dueMode === 'MONTHS') {
@@ -62,7 +42,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
       fatherName.trim(),
       address.trim(),
       phone.trim(), 
-      croppedImage || undefined,
+      image || undefined,
       new Date(joiningDate),
       finalDue
     );
@@ -75,22 +55,12 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
     setDueMonths('0');
     setManualDue('0');
     setDueMode('MONTHS');
-    setCroppedImage(null);
-    setRawImage(null);
+    setImage(null);
     onClose();
   };
 
   return (
-    <>
-      {rawImage && (
-        <ImageCropper 
-          imageSrc={rawImage} 
-          onCrop={handleCropComplete} 
-          onCancel={() => setRawImage(null)} 
-        />
-      )}
-
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div 
           className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
           onClick={onClose}
@@ -105,32 +75,12 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Image Upload */}
-            <div className="flex justify-center">
-               <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-slate-100 cursor-pointer flex flex-col items-center justify-center text-slate-400 transition-all overflow-hidden group shadow-sm"
-               >
-                  {croppedImage ? (
-                     <img src={croppedImage} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                     <>
-                       <ImageIcon className="w-8 h-8 mb-1 group-hover:scale-110 transition-transform" />
-                       <span className="text-[10px] font-medium uppercase tracking-wider">Photo</span>
-                     </>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-white text-xs font-medium">Change</span>
-                  </div>
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleImageChange}
-                  />
-               </div>
-            </div>
+            {/* New Smart Camera Input */}
+            <SmartCameraInput 
+                onCapture={setImage} 
+                currentImage={image} 
+                label="Student Photo" 
+            />
 
             <div className="space-y-4">
               <div className="space-y-2">
@@ -260,7 +210,6 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
             </button>
           </form>
         </div>
-      </div>
-    </>
+    </div>
   );
 };

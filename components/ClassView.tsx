@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Users, Search } from 'lucide-react';
 import { ClassGroup } from '../types';
@@ -6,8 +7,8 @@ import { StudentCard } from './StudentCard';
 import { AddStudentModal } from './AddStudentModal';
 import { ClearDueModal } from './ClearDueModal';
 import { EditDueModal } from './EditDueModal';
-import { ImageCropper } from './ImageCropper';
 import { StudentDetailView } from './StudentDetailView';
+import { processImage } from '../lib/imageCompression';
 
 interface ClassViewProps {
   classGroup: ClassGroup;
@@ -41,7 +42,6 @@ export const ClassView: React.FC<ClassViewProps> = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const [editingImageStudentId, setEditingImageStudentId] = useState<string | null>(null);
-  const [rawImageForEdit, setRawImageForEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -84,34 +84,29 @@ export const ClassView: React.FC<ClassViewProps> = ({
 
   const handleEditImageClick = (studentId: string) => {
     setEditingImageStudentId(studentId);
-    setTimeout(() => { fileInputRef.current?.click(); }, 0);
+    // Add small delay to ensure ref is available if conditionally rendered
+    setTimeout(() => { fileInputRef.current?.click(); }, 50);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRawImageForEdit(reader.result as string);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      reader.readAsDataURL(file);
-    } else {
-        setEditingImageStudentId(null);
+    if (file && editingImageStudentId) {
+        try {
+            const processed = await processImage(file);
+            onUpdateStudentImage(editingImageStudentId, processed);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to process image.");
+        }
     }
-  };
-
-  const handleCropComplete = (croppedImage: string) => {
-    if (editingImageStudentId) { onUpdateStudentImage(editingImageStudentId, croppedImage); }
-    setRawImageForEdit(null);
     setEditingImageStudentId(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   if (selectedStudent) {
     return (
       <>
        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-       {rawImageForEdit && <ImageCropper imageSrc={rawImageForEdit} onCrop={handleCropComplete} onCancel={() => { setRawImageForEdit(null); setEditingImageStudentId(null); }} />}
       <StudentDetailView
         student={selectedStudent}
         classGroup={classGroup}
@@ -137,7 +132,6 @@ export const ClassView: React.FC<ClassViewProps> = ({
       />
 
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-      {rawImageForEdit && <ImageCropper imageSrc={rawImageForEdit} onCrop={handleCropComplete} onCancel={() => { setRawImageForEdit(null); setEditingImageStudentId(null); }} />}
 
       <div className="sticky top-[73px] z-40 bg-zinc-50/95 backdrop-blur-sm px-6 pt-2 pb-2 border-b border-zinc-200/50">
         <div className="flex p-1 bg-white rounded-xl border border-zinc-200 shadow-sm">

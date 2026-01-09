@@ -1,8 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Header } from './components/Header';
+import { Loader2 } from 'lucide-react';
 import { AddBusinessMenu } from './components/AddBusinessMenu';
 import { InstitutionView } from './components/InstitutionView';
 import { ClassView } from './components/ClassView';
@@ -11,8 +8,8 @@ import { SettingsSidebar } from './components/SettingsSidebar';
 import { BusinessContextMenu } from './components/BusinessContextMenu';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { HistoryView } from './components/HistoryView';
-import { HomeDashboard } from './components/HomeDashboard'; 
-import { PinnedItemsSection, PinnedItem } from './components/PinnedItemsSection';
+import { MainScreen } from './components/MainScreen';
+import { PinnedItem } from './components/PinnedItemsSection';
 import { AuthScreen } from './components/AuthScreen';
 import { ProfileSetupScreen } from './components/ProfileSetupScreen';
 import { Business, BusinessType, Student, PaymentRecord, UserProfile } from './types';
@@ -39,6 +36,8 @@ export const App: React.FC = () => {
   const [uiVersion, setUiVersion] = useState<'modern' | 'classic'>('modern');
   
   const [activeBusinessId, setActiveBusinessId] = useState<string | null>(null);
+  const [activeBusinessView, setActiveBusinessView] = useState<'DASHBOARD' | 'DUEBOOK'>('DASHBOARD');
+
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
   const [initialStudentId, setInitialStudentId] = useState<string | null>(null); 
   
@@ -48,7 +47,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (isFirebaseEnabled && auth) {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
                 setIsAuthenticated(true);
                 setCurrentUserEmail(user.email || '');
@@ -106,15 +105,14 @@ export const App: React.FC = () => {
           setIsEditingProfile(false);
       } catch (e: any) {
           console.error("Failed to save profile:", e);
-          // Alert the user so they are not stuck
           alert("Could not save your profile. \n\nPlease ensure you have created a Cloud Firestore Database in your Firebase Console and the Rules allow writes.\n\nError: " + (e.message || "Unknown Error"));
-          throw e; // Propagate error so button stops loading but stays on screen
+          throw e; 
       }
   };
 
   const handleLogout = async () => {
       if (isFirebaseEnabled && auth) {
-          await signOut(auth);
+          await auth.signOut();
       } else {
           setIsAuthenticated(false);
       }
@@ -196,22 +194,24 @@ export const App: React.FC = () => {
   const handleNavigateFromHistory = (businessId: string, classId: string | undefined, studentId: string) => {
     setIsHistoryOpen(false);
     setActiveBusinessId(businessId);
+    setActiveBusinessView('DUEBOOK'); 
     if (classId) {
       setActiveClassId(classId); 
     }
     setInitialStudentId(studentId);
   };
 
-  const handleOpenBusiness = (businessId: string) => {
+  const handleOpenBusiness = (businessId: string, viewMode: 'DASHBOARD' | 'DUEBOOK' = 'DASHBOARD') => {
     const business = businesses.find(b => b.id === businessId);
     if (business?.isNew) {
         updateBusiness({ ...business, isNew: false });
     }
+    setActiveBusinessView(viewMode);
     setActiveBusinessId(businessId);
   };
   
   const handleOpenItem = (businessId: string, itemId: string) => {
-      handleOpenBusiness(businessId);
+      handleOpenBusiness(businessId, 'DUEBOOK');
       const bus = businesses.find(b => b.id === businessId);
       if (bus?.type === BusinessType.TEACHER_STUDENT) {
           setActiveClassId(itemId);
@@ -312,10 +312,32 @@ export const App: React.FC = () => {
                                 const updatedBusiness = { ...business, classes: business.classes?.map(c => c.id === activeClass.id ? updatedClass : c) };
                                 updateBusiness(updatedBusiness);
                             }}
-                            onUpdateStudentDue={(studentId, newDue) => {
+                            onUpdateStudentDue={(studentId, newGrossDue) => {
                                  const updatedClass = {
                                      ...activeClass,
-                                     students: activeClass.students?.map(s => s.id === studentId ? { ...s, totalDue: newDue } : s)
+                                     students: activeClass.students?.map(s => {
+                                         if (s.id === studentId) {
+                                             const oldDue = s.totalDue;
+                                             const addedAmount = newGrossDue - oldDue;
+                                             
+                                             let finalDue = newGrossDue;
+                                             let finalAdvance = s.advanceAmount;
+
+                                             if (addedAmount > 0 && finalAdvance > 0) {
+                                                 if (finalAdvance >= addedAmount) {
+                                                     finalAdvance -= addedAmount;
+                                                     finalDue -= addedAmount; 
+                                                 } else {
+                                                     const covered = finalAdvance;
+                                                     finalAdvance = 0;
+                                                     finalDue -= covered;
+                                                 }
+                                             }
+                                             
+                                             return { ...s, totalDue: finalDue, advanceAmount: finalAdvance };
+                                         }
+                                         return s;
+                                     })
                                  };
                                  const updatedBusiness = { ...business, classes: business.classes?.map(c => c.id === activeClass.id ? updatedClass : c) };
                                  updateBusiness(updatedBusiness);
@@ -341,10 +363,28 @@ export const App: React.FC = () => {
                                      ...activeClass,
                                      students: activeClass.students?.map(s => {
                                          if (s.id === studentId) {
-                                             const record: PaymentRecord = { id: crypto.randomUUID(), amount, date: new Date(), description, type: 'PAYMENT' };
+                                             let newDue = s.totalDue;
+                                             let newAdvance = s.advanceAmount;
+
+                                             if (newDue >= amount) {
+                                                 newDue -= amount;
+                                             } else {
+                                                 const surplus = amount - newDue;
+                                                 newDue = 0;
+                                                 newAdvance += surplus;
+                                             }
+
+                                             const record: PaymentRecord = { 
+                                                id: crypto.randomUUID(), 
+                                                amount, 
+                                                date: new Date(), 
+                                                description, 
+                                                type: 'PAYMENT' 
+                                             };
                                              return { 
                                                  ...s, 
-                                                 totalDue: Math.max(0, s.totalDue - amount), 
+                                                 totalDue: newDue, 
+                                                 advanceAmount: newAdvance,
                                                  paymentHistory: [...s.paymentHistory, record] 
                                              };
                                          }
@@ -371,6 +411,7 @@ export const App: React.FC = () => {
               return (
                   <ShopView 
                     business={business}
+                    initialView={activeBusinessView}
                     initialGroupId={activeClassId || undefined} 
                     onBack={() => { setActiveBusinessId(null); setActiveClassId(null); }}
                     onUpdate={updateBusiness}
@@ -396,40 +437,26 @@ export const App: React.FC = () => {
     : { cardBg: 'bg-white', border: 'border-slate-100' };
 
   return (
-    <div className={`min-h-screen pb-24 transition-colors duration-500 ${uiVersion === 'modern' ? 'bg-zinc-50' : 'bg-slate-50'}`}>
-      <Header 
-        variant="home" 
-        title="Bahi Khata"
-        subtitle="by P.Gupta"
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenHistory={() => setIsHistoryOpen(true)}
-        uiVersion={uiVersion}
+    <>
+      <MainScreen 
+         businesses={sortedBusinesses}
+         pinnedItems={pinnedItems}
+         uiVersion={uiVersion}
+         theme={theme}
+         onOpenBusiness={handleOpenBusiness}
+         onOpenItem={handleOpenItem}
+         onContextMenu={(id) => setContextMenuBusinessId(id)}
+         onOpenSettings={() => setIsSettingsOpen(true)}
+         onOpenHistory={() => setIsHistoryOpen(true)}
+         onOpenAddBusiness={() => setIsMenuOpen(true)}
       />
 
-      <HomeDashboard 
-        businesses={sortedBusinesses}
-        pinnedItems={pinnedItems}
-        uiVersion={uiVersion}
-        onOpenBusiness={handleOpenBusiness}
-        onOpenItem={handleOpenItem}
-        onContextMenu={(id) => { setContextMenuBusinessId(id); }}
-        theme={theme}
-      />
-
-      <div className="fixed bottom-8 right-6 z-40">
-        <button
-          onClick={() => setIsMenuOpen(true)}
-          className={`group relative flex items-center justify-center w-16 h-16 text-white rounded-2xl shadow-xl transition-all duration-300 focus:outline-none hover:scale-105 ${uiVersion === 'modern' ? 'bg-violet-600 hover:bg-violet-700 shadow-violet-300 hover:shadow-violet-400 focus:ring-4 focus:ring-violet-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-300 hover:shadow-indigo-400 focus:ring-4 focus:ring-indigo-200'}`}
-        >
-          <Plus className="w-8 h-8 group-hover:rotate-90 transition-transform duration-300" />
-        </button>
-      </div>
-
+      {/* Global Overlays */}
       <AddBusinessMenu 
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)} 
         onCreate={(type, name, owner) => {
-            const newId = addBusiness(type, name, owner);
+            addBusiness(type, name, owner);
             setIsMenuOpen(false);
         }}
       />
@@ -472,6 +499,6 @@ export const App: React.FC = () => {
          itemName={businesses.find(b => b.id === businessToDeleteId)?.name || 'Workspace'}
          confirmLabel="Delete Workspace"
       />
-    </div>
+    </>
   );
 };

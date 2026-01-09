@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Pin, User, BookOpen, Wallet } from 'lucide-react';
 import { Business, ClassGroup, Customer } from '../types';
@@ -14,7 +15,7 @@ interface PinnedItemsSectionProps {
     uiVersion: 'modern' | 'classic';
     theme: { cardBg: string; border: string; };
     onOpenItem: (businessId: string, itemId: string) => void;
-    onOpenBusiness: (businessId: string) => void;
+    onOpenBusiness: (businessId: string, viewMode?: 'DASHBOARD' | 'DUEBOOK') => void;
 }
 
 export const PinnedItemsSection: React.FC<PinnedItemsSectionProps> = ({ 
@@ -42,7 +43,7 @@ export const PinnedItemsSection: React.FC<PinnedItemsSectionProps> = ({
                         return (
                             <div 
                                 key={`bus-${bus.id}`}
-                                onClick={() => onOpenBusiness(bus.id)}
+                                onClick={() => onOpenBusiness(bus.id, 'DUEBOOK')}
                                 className="bg-gradient-to-br from-pink-500 to-rose-600 p-4 rounded-2xl shadow-lg shadow-pink-200 border border-pink-400/20 active:scale-95 transition-all cursor-pointer hover:shadow-xl group relative overflow-hidden text-white"
                             >
                                 <div className="absolute top-0 right-0 p-2 opacity-20">

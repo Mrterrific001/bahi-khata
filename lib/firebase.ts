@@ -1,6 +1,7 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import 'firebase/compat/firestore';
 
 const getEnv = (key: string) => {
   try {
@@ -15,9 +16,9 @@ const projectId = getEnv('VITE_FIREBASE_PROJECT_ID');
 
 export const isFirebaseEnabled = !!(apiKey && projectId);
 
-let auth: Auth | null = null;
-let googleProvider: GoogleAuthProvider | null = null;
-let db: Firestore | null = null;
+let auth: firebase.auth.Auth | null = null;
+let googleProvider: firebase.auth.GoogleAuthProvider | null = null;
+let db: firebase.firestore.Firestore | null = null;
 
 if (isFirebaseEnabled) {
   try {
@@ -30,10 +31,15 @@ if (isFirebaseEnabled) {
       appId: getEnv('VITE_FIREBASE_APP_ID')
     };
 
-    const app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    googleProvider = new GoogleAuthProvider();
-    db = getFirestore(app);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    } else {
+      firebase.app();
+    }
+    
+    auth = firebase.auth();
+    googleProvider = new firebase.auth.GoogleAuthProvider();
+    db = firebase.firestore();
     
     console.log("Firebase initialized successfully");
   } catch (error) {

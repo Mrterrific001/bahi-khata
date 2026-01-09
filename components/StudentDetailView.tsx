@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ArrowLeft, MapPin, Phone, User, Calendar, CheckCircle, Clock, IndianRupee, Pencil, Wallet, Gift, Trash2 } from 'lucide-react';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Edit2, Phone, MapPin, Calendar, CheckCircle, Clock, IndianRupee, Pencil, Wallet, Gift, Trash2, User } from 'lucide-react';
 import { Student, ClassGroup } from '../types';
 import { Header } from './Header';
 import { EditStudentModal } from './EditStudentModal';
@@ -28,6 +29,52 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
+  // Animation Logic
+  const prevDueRef = useRef(student.totalDue);
+  const prevAdvanceRef = useRef(student.advanceAmount);
+  const [anim, setAnim] = useState<{ text: string; colorClass: string; bgClass: string; borderClass: string } | null>(null);
+
+  useEffect(() => {
+    const prevDue = prevDueRef.current;
+    const prevAdvance = prevAdvanceRef.current;
+    const currDue = student.totalDue;
+    const currAdvance = student.advanceAmount;
+
+    const prevBalance = prevDue - prevAdvance;
+    const currBalance = currDue - currAdvance;
+    const diff = currBalance - prevBalance;
+
+    let cleanup;
+
+    if (Math.abs(diff) > 0.01) {
+        let newAnim = null;
+        if (diff > 0) {
+            newAnim = { 
+                text: `- ₹${Math.abs(diff)}`, 
+                colorClass: 'text-rose-700',
+                bgClass: 'bg-rose-50',
+                borderClass: 'border-rose-200'
+            };
+        } else {
+            const amount = Math.abs(diff);
+            const isPayment = prevDue > 0;
+            newAnim = { 
+                text: `+ ₹${amount}`, 
+                colorClass: isPayment ? 'text-emerald-700' : 'text-yellow-700',
+                bgClass: isPayment ? 'bg-emerald-50' : 'bg-yellow-50',
+                borderClass: isPayment ? 'border-emerald-200' : 'border-yellow-200'
+            };
+        }
+        setAnim(newAnim);
+        const t = setTimeout(() => setAnim(null), 1500); 
+        cleanup = () => clearTimeout(t);
+    }
+
+    prevDueRef.current = currDue;
+    prevAdvanceRef.current = currAdvance;
+    return cleanup;
+  }, [student.totalDue, student.advanceAmount]);
+
   // Calculate Course Metrics
   const totalPaid = student.paymentHistory.reduce((sum, rec) => sum + rec.amount, 0);
   const totalCourseFee = classGroup.totalCourseFee || 0;
@@ -36,14 +83,9 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
   // Logic to generate the calendar
   const getCourseCalendar = () => {
     const months = [];
-    // Start date should align with Class Start Date if fixed, or Student Joining if flexible.
-    // For batch systems, it usually aligns with Class Start Date.
-    // However, if the student joins late, the prompt implies "monthly fee completes course fee".
-    // We will stick to student joining date for personal calendar view or class start date?
-    // Using Class Start Date is safer for "Batch" logic.
     const startDate = classGroup.startDate ? new Date(classGroup.startDate) : new Date(student.joiningDate);
     
-    const duration = classGroup.courseDuration || 12; // Default to 12 months if not set
+    const duration = classGroup.courseDuration || 12; 
     
     for (let i = 0; i < duration; i++) {
         const d = new Date(startDate);
@@ -94,14 +136,11 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
     if (isPending) return 'DUE'; // Explicitly marked as Due
     
     if (isCourseFullyPaid) {
-        // Double check if this specific month was actually "Free" due to cap
         if (totalCourseFee > 0 && (cumulativeCost - effectiveCostForThisMonth) >= totalCourseFee) return 'FREE';
         return 'CLEARED';
     }
 
     if (totalPaid >= cumulativeCost) return 'CLEARED';
-    
-    // Partial payment logic could go here, but for now binary Cleared/Future
     if (isFuture) return 'FUTURE';
     
     return 'CLEARED'; // Fallback
@@ -109,6 +148,16 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
+      {/* Animation Style */}
+      <style>{`
+        @keyframes slideInRight {
+            0% { transform: translateX(120%); opacity: 0; }
+            15% { transform: translateX(0); opacity: 1; }
+            80% { opacity: 1; transform: translateX(0); }
+            100% { transform: translateX(-20px); opacity: 0; }
+        }
+      `}</style>
+
       <Header 
         title="Student Profile" 
         subtitle="Detailed Info & History" 
@@ -122,6 +171,17 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({
         
         {/* Profile Card */}
         <div className={`rounded-3xl shadow-sm border overflow-hidden relative ${isCourseFullyPaid ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+           
+           {/* Animation Layer */}
+           {anim && (
+                <div 
+                className={`absolute top-4 right-4 z-50 flex items-center justify-center px-4 py-2 rounded-xl border shadow-lg font-black text-lg ${anim.bgClass} ${anim.colorClass} ${anim.borderClass} pointer-events-none`}
+                style={{ animation: 'slideInRight 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+                >
+                    {anim.text}
+                </div>
+           )}
+
            <div className={`h-24 bg-gradient-to-r ${isCourseFullyPaid ? 'from-emerald-500 to-emerald-600' : 'from-indigo-500 to-indigo-600'}`}></div>
            <div className="px-6 pb-6">
              <div className="relative -mt-12 mb-4 flex justify-between items-end">

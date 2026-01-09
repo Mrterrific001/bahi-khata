@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Search, Calendar, User, ArrowUpRight, Store } from 'lucide-react';
 import { PaymentRecord, BusinessType } from '../types';
@@ -36,7 +37,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onBack, 
     return data;
   }, [transactions, searchQuery]);
 
-  const totalRevenue = useMemo(() => transactions.reduce((sum, t) => sum + t.amount, 0), [transactions]);
+  const totalRevenue = useMemo(() => transactions.reduce((sum, t) => {
+      // Only count actual payments towards revenue, not due additions
+      if (t.type !== 'DUE_ADDED') {
+          return sum + t.amount;
+      }
+      return sum;
+  }, 0), [transactions]);
 
   // Group by Date
   const groupedTransactions = useMemo(() => {
@@ -103,42 +110,47 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onBack, 
                     </h3>
                 </div>
                 <div className="space-y-3">
-                  {items.map(t => (
-                    <div 
-                      key={t.id}
-                      onClick={() => onNavigateToItem(t.businessId, t.classId, t.studentId)}
-                      className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-100 flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer hover:shadow-md"
-                    >
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                        t.businessType === BusinessType.TEACHER_STUDENT 
-                          ? 'bg-indigo-50 text-indigo-600' // Blue/Indigo Theme for Institution
-                          : 'bg-emerald-50 text-emerald-600' // Green Theme for Shop
-                      }`}>
-                         {t.businessType === BusinessType.TEACHER_STUDENT ? <User className="w-6 h-6" /> : <Store className="w-6 h-6" />}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-zinc-800 truncate text-base">{t.studentName}</h4>
-                          <span className={`font-bold text-base ${t.businessType === BusinessType.SHOP ? 'text-emerald-600' : 'text-indigo-600'}`}>+₹{t.amount}</span>
+                  {items.map(t => {
+                    const isDueAdded = t.type === 'DUE_ADDED';
+                    return (
+                        <div 
+                        key={t.id}
+                        onClick={() => onNavigateToItem(t.businessId, t.classId, t.studentId)}
+                        className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-100 flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer hover:shadow-md"
+                        >
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                            t.businessType === BusinessType.TEACHER_STUDENT 
+                            ? 'bg-indigo-50 text-indigo-600' // Blue/Indigo Theme for Institution
+                            : 'bg-emerald-50 text-emerald-600' // Green Theme for Shop
+                        }`}>
+                            {t.businessType === BusinessType.TEACHER_STUDENT ? <User className="w-6 h-6" /> : <Store className="w-6 h-6" />}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-zinc-500 mt-0.5 truncate">
-                           <span className="font-medium">{t.businessName}</span>
-                           {t.className && (
-                             <>
-                               <span className="w-1 h-1 rounded-full bg-zinc-300" />
-                               <span>{t.className}</span>
-                             </>
-                           )}
-                        </div>
-                        <div className="mt-2">
-                             <span className="text-[10px] text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md font-medium">
-                                {t.description}
+                        
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-zinc-800 truncate text-base">{t.studentName}</h4>
+                            <span className={`font-bold text-base ${isDueAdded ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {isDueAdded ? '-' : '+'}₹{t.amount}
                             </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-500 mt-0.5 truncate">
+                            <span className="font-medium">{t.businessName}</span>
+                            {t.className && (
+                                <>
+                                <span className="w-1 h-1 rounded-full bg-zinc-300" />
+                                <span>{t.className}</span>
+                                </>
+                            )}
+                            </div>
+                            <div className="mt-2">
+                                <span className={`text-[10px] px-2 py-1 rounded-md font-medium ${isDueAdded ? 'bg-red-50 text-red-600' : 'bg-zinc-100 text-zinc-500'}`}>
+                                    {t.description}
+                                </span>
+                            </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Plus, Store, ArrowRight, GraduationCap } from 'lucide-react';
 import { Business, BusinessType } from '../types';
@@ -7,7 +8,7 @@ interface HomeDashboardProps {
   businesses: Business[];
   pinnedItems: PinnedItem[];
   uiVersion: 'modern' | 'classic';
-  onOpenBusiness: (id: string) => void;
+  onOpenBusiness: (id: string, viewMode?: 'DASHBOARD' | 'DUEBOOK') => void;
   onOpenItem: (businessId: string, itemId: string) => void;
   onContextMenu: (businessId: string) => void;
   theme: { cardBg: string; border: string; }; 
@@ -74,7 +75,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                     {businesses.map((business) => (
                     <div 
                         key={business.id} 
-                        onClick={() => onOpenBusiness(business.id)}
+                        onClick={() => onOpenBusiness(business.id, 'DASHBOARD')}
                         onMouseDown={() => handleTouchStart(business.id)}
                         onMouseUp={handleTouchEnd}
                         onMouseLeave={handleTouchEnd}

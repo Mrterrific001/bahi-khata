@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Plus, Pencil, CheckCircle, Camera, Calendar, Phone, Sparkles } from 'lucide-react';
 import { Student } from '../types';
@@ -22,6 +23,9 @@ export const StudentCard: React.FC<StudentCardProps> = ({ student, totalCourseFe
   const [isMerging, setIsMerging] = useState(false);
   const [mergedAdvanceSnapshot, setMergedAdvanceSnapshot] = useState(0);
 
+  // New Slide-In Animation State (similar to ShopCustomerCard)
+  const [anim, setAnim] = useState<{ text: string; colorClass: string; bgClass: string; borderClass: string } | null>(null);
+
   // Calculate total paid
   const totalPaid = student.paymentHistory.reduce((sum, rec) => sum + rec.amount, 0);
   const isCourseCompleted = totalCourseFee && totalCourseFee > 0 && totalPaid >= totalCourseFee;
@@ -32,35 +36,67 @@ export const StudentCard: React.FC<StudentCardProps> = ({ student, totalCourseFe
     const currDue = student.totalDue;
     const currAdvance = student.advanceAmount;
 
+    // --- LOGIC 1: Visual Transitions (Ghosts) ---
     // Detect Due Clearing (Positive -> Zero)
     if (prevDue > 0 && currDue === 0) {
         setClearedAmountSnapshot(prevDue);
         setIsClearing(true);
-        // Reset after animation
-        const timer = setTimeout(() => setIsClearing(false), 1300); // Slightly longer than CSS animation
+        const timer = setTimeout(() => setIsClearing(false), 1300);
         return () => clearTimeout(timer);
     }
-
     // Detect Advance Merging (Advance Decreased AND Due Changed)
-    // This implies advance was used to pay off/reduce due
     if (prevAdvance > 0 && currAdvance < prevAdvance) {
-        setMergedAdvanceSnapshot(prevAdvance); // We animate the OLD advance amount sliding in
+        setMergedAdvanceSnapshot(prevAdvance);
         setIsMerging(true);
         const timer = setTimeout(() => setIsMerging(false), 1600);
         return () => clearTimeout(timer);
     }
 
+    // --- LOGIC 2: Numeric Slide-In Animation (Add/Subtract Value) ---
+    // Calculate Net Balance Change
+    // Balance = Due - Advance. Positive = Debt. Negative = Credit.
+    const prevBalance = prevDue - prevAdvance;
+    const currBalance = currDue - currAdvance;
+    const diff = currBalance - prevBalance;
+
+    let cleanup;
+    
+    // Only animate if there is a real value change > 0.01
+    if (Math.abs(diff) > 0.01) {
+        let newAnim = null;
+
+        if (diff > 0) {
+            // Debt Increased (Due Added or Advance Used) -> Red
+            newAnim = { 
+                text: `- ₹${Math.abs(diff)}`, 
+                colorClass: 'text-rose-700',
+                bgClass: 'bg-rose-50',
+                borderClass: 'border-rose-200'
+            };
+        } else {
+            // Debt Decreased (Payment or Advance Added) -> Green/Yellow
+            const amount = Math.abs(diff);
+            const isPayment = prevDue > 0;
+            
+            newAnim = { 
+                text: `+ ₹${amount}`, 
+                colorClass: isPayment ? 'text-emerald-700' : 'text-yellow-700',
+                bgClass: isPayment ? 'bg-emerald-50' : 'bg-yellow-50',
+                borderClass: isPayment ? 'border-emerald-200' : 'border-yellow-200'
+            };
+        }
+
+        setAnim(newAnim);
+        const t = setTimeout(() => setAnim(null), 1500); 
+        cleanup = () => clearTimeout(t);
+    }
+
     // Update Refs
     prevDueRef.current = currDue;
     prevAdvanceRef.current = currAdvance;
+    
+    return cleanup;
   }, [student.totalDue, student.advanceAmount]);
-
-  // Update refs on every render to ensure they are current for next effect
-  useEffect(() => {
-    prevDueRef.current = student.totalDue;
-    prevAdvanceRef.current = student.advanceAmount;
-  });
-
 
   return (
     <div className={`p-3 rounded-2xl shadow-sm border transition-all active:scale-[0.99] duration-200 relative overflow-hidden ${
@@ -68,6 +104,30 @@ export const StudentCard: React.FC<StudentCardProps> = ({ student, totalCourseFe
         ? 'bg-emerald-50 border-emerald-200' 
         : 'bg-white border-slate-100 hover:shadow-md'
     }`}>
+      {/* 
+          ANIMATION LAYER 
+      */}
+      {anim && (
+          <div 
+            className={`absolute top-2 right-2 z-20 flex items-center justify-center px-3 py-1.5 rounded-xl border shadow-sm font-black text-sm ${anim.bgClass} ${anim.colorClass} ${anim.borderClass} pointer-events-none`}
+            style={{
+                animation: 'slideInRight 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            }}
+          >
+             {anim.text}
+          </div>
+      )}
+      
+      {/* Animation Keyframes Definition (Scoped) */}
+      <style>{`
+        @keyframes slideInRight {
+            0% { transform: translateX(120%); opacity: 0; }
+            15% { transform: translateX(0); opacity: 1; }
+            80% { opacity: 1; transform: translateX(0); }
+            100% { transform: translateX(-20px); opacity: 0; }
+        }
+      `}</style>
+
       {isCourseCompleted && (
           <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
              <Sparkles className="w-24 h-24 text-emerald-600 rotate-12" />

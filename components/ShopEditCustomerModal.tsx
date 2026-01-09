@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Camera, User, Phone, MapPin } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { X, Save, User, Phone, MapPin } from 'lucide-react';
 import { Customer } from '../types';
-import { ImageCropper } from './ImageCropper';
+import { SmartCameraInput } from './SmartCameraInput';
 
 interface ShopEditCustomerModalProps {
   isOpen: boolean;
@@ -14,39 +15,18 @@ export const ShopEditCustomerModal: React.FC<ShopEditCustomerModalProps> = ({ is
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  
-  // Image State
-  const [rawImage, setRawImage] = useState<string | null>(null);
-  const [croppedImage, setCroppedImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [image, setImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && customer) {
       setName(customer.name);
       setPhone(customer.phoneNumber);
       setAddress(customer.address || '');
-      setCroppedImage(customer.photoUrl || null);
+      setImage(customer.photoUrl || null);
     }
   }, [isOpen, customer]);
 
   if (!isOpen) return null;
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRawImage(reader.result as string);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCropComplete = (cropped: string) => {
-    setCroppedImage(cropped);
-    setRawImage(null);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,23 +34,14 @@ export const ShopEditCustomerModal: React.FC<ShopEditCustomerModalProps> = ({ is
       name: name.trim(),
       phoneNumber: phone.trim(),
       address: address.trim() || undefined,
-      photoUrl: croppedImage || undefined,
+      photoUrl: image || undefined,
       updatedAt: new Date()
     });
     onClose();
   };
 
   return (
-    <>
-      {rawImage && (
-        <ImageCropper 
-          imageSrc={rawImage} 
-          onCrop={handleCropComplete} 
-          onCancel={() => setRawImage(null)} 
-        />
-      )}
-
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
         <div 
           className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
           onClick={onClose}
@@ -86,32 +57,11 @@ export const ShopEditCustomerModal: React.FC<ShopEditCustomerModalProps> = ({ is
 
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Image Upload */}
-            <div className="flex justify-center mb-6">
-               <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-slate-100 cursor-pointer flex flex-col items-center justify-center text-slate-400 transition-all overflow-hidden group shadow-sm"
-               >
-                  {croppedImage ? (
-                     <img src={croppedImage} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                     <>
-                       <Camera className="w-8 h-8 mb-1 group-hover:scale-110 transition-transform text-slate-300 group-hover:text-emerald-500" />
-                       <span className="text-[10px] font-medium uppercase tracking-wider">Photo</span>
-                     </>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-white text-xs font-medium">Change</span>
-                  </div>
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleImageChange}
-                  />
-               </div>
-            </div>
+            <SmartCameraInput 
+                onCapture={setImage} 
+                currentImage={image} 
+                label="Photo" 
+            />
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Name</label>
@@ -163,7 +113,6 @@ export const ShopEditCustomerModal: React.FC<ShopEditCustomerModalProps> = ({ is
             </button>
           </form>
         </div>
-      </div>
-    </>
+    </div>
   );
 };

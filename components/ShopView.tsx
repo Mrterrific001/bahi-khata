@@ -12,19 +12,23 @@ import { ShopActionModal } from './ShopActionModal';
 import { ShopCustomerContextMenu } from './ShopCustomerContextMenu';
 import { ShopOptionContextMenu } from './ShopOptionContextMenu';
 import { ConfirmationModal } from './ConfirmationModal';
-import { ImageCropper } from './ImageCropper';
+import { processImage } from '../lib/imageCompression';
 
 interface ShopViewProps {
   business: Business;
   initialGroupId?: string;
+  initialView?: 'DASHBOARD' | 'DUEBOOK'; // New Prop
   onBack: () => void;
   onUpdate: (updatedBusiness: Business) => void;
   onTogglePin: () => void;
 }
 
-export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, onBack, onUpdate, onTogglePin }) => {
+export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, initialView, onBack, onUpdate, onTogglePin }) => {
   // State for View Mode
-  const [view, setView] = useState<'DASHBOARD' | 'DUEBOOK'>('DASHBOARD');
+  // If initialGroupId exists (deep link) OR initialView is explicitly DUEBOOK (pinned item), start in DUEBOOK
+  const [view, setView] = useState<'DASHBOARD' | 'DUEBOOK'>(
+      (initialGroupId || initialView === 'DUEBOOK') ? 'DUEBOOK' : 'DASHBOARD'
+  );
 
   // Initialization Logic for Groups
   useEffect(() => {
@@ -64,9 +68,8 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
   // Option Menu State (Due Book Pinning)
   const [isOptionMenuOpen, setIsOptionMenuOpen] = useState(false);
 
-  // Image Cropping State
+  // Image Editing State
   const [editingImageCustomerId, setEditingImageCustomerId] = useState<string | null>(null);
-  const [rawImage, setRawImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derived state
@@ -167,22 +170,20 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
       onUpdate({ ...business, customers: updatedCustomers });
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const reader = new FileReader();
-          reader.onload = () => setRawImage(reader.result as string);
-          reader.readAsDataURL(e.target.files[0]);
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && editingImageCustomerId) {
+          try {
+              const processed = await processImage(file);
+              const updatedCustomers = (business.customers || []).map(c => 
+                  c.id === editingImageCustomerId ? { ...c, photoUrl: processed, updatedAt: new Date() } : c
+              );
+              onUpdate({ ...business, customers: updatedCustomers });
+          } catch(err) {
+              console.error(err);
+              alert("Failed to process image.");
+          }
       }
-  };
-
-  const handleImageCrop = (croppedData: string) => {
-      if (editingImageCustomerId) {
-          const updatedCustomers = (business.customers || []).map(c => 
-              c.id === editingImageCustomerId ? { ...c, photoUrl: croppedData, updatedAt: new Date() } : c
-          );
-          onUpdate({ ...business, customers: updatedCustomers });
-      }
-      setRawImage(null);
       setEditingImageCustomerId(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -235,15 +236,8 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
   // 2. DUEBOOK VIEW
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans">
-      {/* Hidden Inputs/Modals */}
+      {/* Hidden Inputs */}
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} />
-      {rawImage && (
-          <ImageCropper 
-            imageSrc={rawImage} 
-            onCrop={handleImageCrop} 
-            onCancel={() => { setRawImage(null); setEditingImageCustomerId(null); }} 
-          />
-      )}
       
       {/* Detail View Overlay */}
       {selectedCustomer && (
@@ -251,6 +245,7 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
               customer={selectedCustomer}
               onBack={() => setSelectedCustomerId(null)}
               onUpdateCustomer={handleUpdateCustomer}
+              onAction={(type) => setActionModal({ isOpen: true, type, customerId: selectedCustomer.id })}
           />
       )}
 
@@ -292,7 +287,8 @@ export const ShopView: React.FC<ShopViewProps> = ({ business, initialGroupId, on
             onContextMenu={setContextMenuCustomerId}
             onEditImage={(id) => {
                 setEditingImageCustomerId(id);
-                fileInputRef.current?.click();
+                // Trigger input directly
+                setTimeout(() => fileInputRef.current?.click(), 50);
             }}
             onAction={(type, id) => setActionModal({ isOpen: true, type, customerId: id })}
             onSelectCustomer={(c) => setSelectedCustomerId(c.id)}

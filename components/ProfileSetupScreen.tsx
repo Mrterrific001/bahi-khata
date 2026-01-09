@@ -1,8 +1,8 @@
 
-import React, { useState, useRef } from 'react';
-import { Camera, User, Phone, ArrowRight, Check, Shield, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Phone, ArrowRight, Check, Shield, Loader2 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { ImageCropper } from './ImageCropper';
+import { SmartCameraInput } from './SmartCameraInput';
 
 interface ProfileSetupScreenProps {
   initialData?: UserProfile | null;
@@ -21,32 +21,11 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '');
   const [phone, setPhone] = useState(initialData?.phoneNumber || '');
+  const [image, setImage] = useState<string | null>(initialData?.photoUrl || null);
   const [isSaving, setIsSaving] = useState(false);
   
   // Use email from data or default from login
   const email = initialData?.email || defaultEmail || '';
-
-  // Image State
-  const [rawImage, setRawImage] = useState<string | null>(null);
-  const [croppedImage, setCroppedImage] = useState<string | null>(initialData?.photoUrl || null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRawImage(reader.result as string);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCropComplete = (cropped: string) => {
-    setCroppedImage(cropped);
-    setRawImage(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,15 +34,13 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
     setIsSaving(true);
     
     try {
-        // Fix: Use spread syntax to only add optional fields if they exist
-        // Firestore throws an error if a field value is explicitly 'undefined'
         const profile: UserProfile = {
           id: initialData?.id || 'current_user',
           name: name.trim(),
           email: email, // Use the read-only email
           createdAt: initialData?.createdAt || new Date(),
           ...(phone.trim() ? { phoneNumber: phone.trim() } : {}),
-          ...(croppedImage ? { photoUrl: croppedImage } : {})
+          ...(image ? { photoUrl: image } : {})
         };
         await onComplete(profile);
     } catch (err) {
@@ -74,14 +51,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
 
   return (
     <div className={`fixed inset-0 z-[200] bg-slate-50 flex flex-col ${isEditing ? 'bg-black/50 backdrop-blur-sm' : ''}`}>
-      {rawImage && (
-        <ImageCropper 
-          imageSrc={rawImage} 
-          onCrop={handleCropComplete} 
-          onCancel={() => setRawImage(null)} 
-        />
-      )}
-
+      
       {/* Main Container */}
       <div className={`flex-1 flex flex-col items-center justify-center p-6 ${isEditing ? 'h-full' : 'min-h-screen'}`}>
         <div className={`w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden relative ${isEditing ? 'animate-in zoom-in-95' : 'animate-in slide-in-from-bottom-10 fade-in duration-500'}`}>
@@ -102,36 +72,14 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
            <div className="px-8 pb-8 -mt-16">
               
               <form onSubmit={handleSubmit}>
-                  {/* Avatar Upload */}
+                  {/* Smart Camera Input */}
                   <div className="flex justify-center mb-8">
-                     <div 
-                        onClick={() => !isSaving && fileInputRef.current?.click()}
-                        className={`relative w-32 h-32 rounded-full bg-white p-1.5 shadow-xl group ${isSaving ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                     >
-                        <div className="w-full h-full rounded-full bg-slate-100 overflow-hidden relative border-2 border-slate-100 group-hover:border-violet-300 transition-colors">
-                            {croppedImage ? (
-                                <img src={croppedImage} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                    <User className="w-12 h-12" />
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                <Camera className="w-8 h-8 text-white" />
-                            </div>
-                        </div>
-                        <div className="absolute bottom-1 right-1 bg-violet-600 text-white p-2 rounded-full shadow-lg border-2 border-white">
-                            <Camera className="w-4 h-4" />
-                        </div>
-                        <input 
-                            ref={fileInputRef}
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={isSaving}
-                            onChange={handleImageChange}
-                        />
-                     </div>
+                     <SmartCameraInput 
+                        onCapture={setImage} 
+                        currentImage={image} 
+                        circular={true}
+                        label="Profile"
+                     />
                   </div>
 
                   <div className="text-center mb-8">
